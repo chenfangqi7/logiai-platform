@@ -14,8 +14,8 @@ class LogisticsTools:
         self.exceptions = ExceptionService(session, tenant_id)
         self.dashboard = DashboardService(session, tenant_id)
 
-    async def search_shipments(self, search: str = "", limit: int = 10) -> dict:
-        total, items = await self.shipments.repo.shipments(search=search, limit=min(limit, 20))
+    async def search_shipments(self, search: str = "", limit: int = 10, status: str = "") -> dict:
+        total, items = await self.shipments.repo.shipments(search=search, status=status, limit=min(limit, 20))
         return {"total": total, "items": [{"id": item.id, "shipment_no": item.shipment_no, "status": item.status,
             "origin": item.origin, "destination": item.destination} for item in items]}
 
@@ -47,7 +47,10 @@ class LogisticsTools:
     async def get_exceptions(self, level: str = "", today: bool = False, limit: int = 10) -> dict:
         from app.services.dashboard import china_day_start
 
-        total, items = await self.exceptions.repo.list(level=level, limit=min(limit, 20), since=china_day_start() if today else None)
+        total, items = await self.exceptions.repo.list(
+            level=level, levels=("HIGH", "CRITICAL") if level == "HIGH" else None,
+            limit=min(limit, 20), since=china_day_start() if today else None,
+        )
         return {"total": total, "items": [{"id": item.id, "shipment_id": item.shipment_id, "type": item.type,
             "level": item.level, "status": item.status, "reason": item.reason, "suggestion": item.suggestion} for item in items]}
 

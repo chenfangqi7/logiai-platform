@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,6 +43,47 @@ class FieldMapping(Identity, Timestamped, Base):
     required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
+class CollectionMapping(Identity, Timestamped, Base):
+    __tablename__ = "collection_mappings"
+    __table_args__ = (UniqueConstraint("tenant_id", "connector_id", "target_entity", name="uq_collection_mapping_entity"),)
+    connector_id: Mapped[str] = mapped_column(String(36), ForeignKey("connectors.id"), nullable=False, index=True)
+    source_field: Mapped[str] = mapped_column(String(200), nullable=False)
+    target_entity: Mapped[str] = mapped_column(String(40), nullable=False)
+    fields: Mapped[list] = mapped_column(JsonType, nullable=False, default=list)
+
+
+class SyncJob(Identity, Base):
+    __tablename__ = "sync_jobs"
+    __table_args__ = (
+        Index("uq_sync_jobs_active_connector", "tenant_id", "connector_id", unique=True,
+              postgresql_where=text("status IN ('PENDING', 'RUNNING')"),
+              sqlite_where=text("status IN ('PENDING', 'RUNNING')")),
+    )
+    connector_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="PENDING")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    total_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    success_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    result: Mapped[dict] = mapped_column(JsonType, nullable=False, default=dict)
+    error_message: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SyncIssue(Identity, Base):
+    __tablename__ = "sync_issues"
+    job_id: Mapped[str] = mapped_column(String(36), ForeignKey("sync_jobs.id"), nullable=False, index=True)
+    connector_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    row_number: Mapped[int | None] = mapped_column(Integer)
+    entity: Mapped[str] = mapped_column(String(40), nullable=False)
+    external_id: Mapped[str | None] = mapped_column(String(100))
+    level: Mapped[str] = mapped_column(String(10), nullable=False)
+    code: Mapped[str] = mapped_column(String(60), nullable=False)
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Vehicle(Identity, Timestamped, Base):
     __tablename__ = "vehicles"
     __table_args__ = (UniqueConstraint("tenant_id", "plate_no", name="uq_vehicle_plate"),)
@@ -72,9 +113,18 @@ class Route(Identity, Timestamped, Base):
 
 class Shipment(Identity, Timestamped, Base):
     __tablename__ = "shipments"
-    __table_args__ = (UniqueConstraint("tenant_id", "shipment_no", name="uq_shipment_no"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "shipment_no", name="uq_shipment_no"),
+        Index("uq_shipments_tenant_source", "tenant_id", "source_connector_id", "source_external_id", unique=True,
+              postgresql_where=text("source_connector_id IS NOT NULL AND source_external_id IS NOT NULL"),
+              sqlite_where=text("source_connector_id IS NOT NULL AND source_external_id IS NOT NULL")),
+    )
     shipment_no: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     external_id: Mapped[str | None] = mapped_column(String(100))
+    source_connector_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    source_external_id: Mapped[str | None] = mapped_column(String(100))
+    source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="UNKNOWN")
     origin: Mapped[str | None] = mapped_column(String(200))
     destination: Mapped[str | None] = mapped_column(String(200))
@@ -94,8 +144,11 @@ class Shipment(Identity, Timestamped, Base):
 
 class TrackingEvent(Identity, Base):
     __tablename__ = "tracking_events"
+    __table_args__ = (Index("uq_tracking_source_event", "tenant_id", "shipment_id", "external_event_id", unique=True,
+        postgresql_where=text("external_event_id IS NOT NULL"), sqlite_where=text("external_event_id IS NOT NULL")),)
     shipment_id: Mapped[str] = mapped_column(String(36), ForeignKey("shipments.id"), nullable=False, index=True)
     event_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    external_event_id: Mapped[str | None] = mapped_column(String(100))
     location: Mapped[str | None] = mapped_column(String(200))
     longitude: Mapped[float | None] = mapped_column(Float)
     latitude: Mapped[float | None] = mapped_column(Float)

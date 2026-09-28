@@ -17,13 +17,15 @@ class ExceptionRepository:
     async def by_rule(self, shipment_id: str, rule_code: str) -> LogisticsException | None:
         return await self.session.scalar(select(LogisticsException).where(LogisticsException.tenant_id == self.tenant_id, LogisticsException.shipment_id == shipment_id, LogisticsException.rule_code == rule_code))
 
-    async def list(self, status: str = "", level: str = "", type: str = "", offset: int = 0, limit: int = 50, since: datetime | None = None) -> tuple[int, list[LogisticsException]]:
+    async def list(self, status: str = "", level: str = "", type: str = "", offset: int = 0, limit: int = 50, since: datetime | None = None, levels: tuple[str, ...] | None = None) -> tuple[int, list[LogisticsException]]:
         query = select(LogisticsException).where(LogisticsException.tenant_id == self.tenant_id)
         if since:
             query = query.where(LogisticsException.detected_at >= since)
         if status:
             query = query.where(LogisticsException.status == status)
-        if level:
+        if levels:
+            query = query.where(LogisticsException.level.in_(levels))
+        elif level:
             query = query.where(LogisticsException.level == level)
         if type:
             query = query.where(LogisticsException.type == type)

@@ -21,7 +21,7 @@ docker compose up -d --build
 
 本机已有服务占用 8000，因此默认把容器的 8000 端口映射到宿主机 8001。PostgreSQL 对外默认映射到 5433。可在 `.env` 设置 `SERVER_PORT` 与 `POSTGRES_PORT` 更改宿主机端口。浏览器页面使用 Vite 代理连接容器内的后端。
 
-默认开发租户代码为 `demo`，用户名为 `admin`，密码取自 `.env` 的 `DEV_ADMIN_PASSWORD`。未提供 `.env` 时的开发默认密码是 `change-this-development-password`，仅适合本机体验。更改已有种子管理员的密码不会自动覆盖数据库中的密码。
+默认开发租户代码为 `demo`，用户名为 `admin`，密码取自 `.env` 的 `DEV_ADMIN_PASSWORD`。未提供 `.env` 时的开发默认密码是 `123456`，仅适合本机体验。更改已有种子管理员的密码不会自动覆盖数据库中的密码。
 
 ## 演示链路
 
@@ -36,7 +36,7 @@ docker compose up -d --build
 
 ## 可选模型配置
 
-不配置 LLM 时，助手和仪表盘给出有明确来源的规则统计回答；异常详情显示“规则分析”。要启用模型分析，设置 `LLM_API_KEY`、`LLM_MODEL`，以及可选的 `LLM_BASE_URL`（默认 OpenAI 兼容 Chat Completions URL）。新导入异常会在请求完成后由进程内后台任务调用模型；异常详情也可手动点击“更新分析”。
+不配置 LLM 时，助手和仪表盘给出有明确来源的规则统计回答；异常详情显示“规则分析”。要启用模型分析，设置 `LLM_API_KEY`、`LLM_MODEL`、`LLM_BASE_URL` 和 `LLM_PROVIDER`。`LLM_PROVIDER=openai-compatible` 使用 Chat Completions；`LLM_PROVIDER=anthropic-messages` 使用 Anthropic Messages `/v1/messages`，可接入支持该协议的内网中转。把中转服务根地址填入 `LLM_BASE_URL`，例如 `http://relay-host:10101`，模型名填入 `LLM_MODEL`。凭证只写在被 Git 忽略的 `.env` 中。新导入异常会在请求完成后由进程内后台任务调用模型；异常详情也可手动点击“更新分析”。
 
 `LLM_INPUT_COST_PER_MILLION` 和 `LLM_OUTPUT_COST_PER_MILLION` 用于按返回的 token 用量估算成本。聊天消息和 `ai_usage` 表记录提供者、模型、token 与成本；费率为 0 时成本值只是未配置费率的占位值。仪表盘模型摘要缓存 5 分钟到 Redis。
 

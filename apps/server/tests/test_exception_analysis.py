@@ -1,36 +1,55 @@
-from types import SimpleNamespace
+import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from app.ai.gateway.llm import Generation
-from app.ai.llm.openai_compatible import OpenAICompatibleProvider
 from app.services.connector import ConnectorService
 from test_connector_import import token
 
 
 @pytest.mark.asyncio
-async def test_exception_analysis_uses_tenant_data_and_persists_model_output(client, monkeypatch):
+async def test_model_exception_analysis_persists_grounded_result(client, monkeypatch):
     http, _, _, _ = client
     first = await token(http, "first", "correct-password")
     second = await token(http, "second", "second-password")
-    connector = await http.post("/api/v1/connectors", headers=first, json={"name": "TMS", "type": "rest", "base_url": "http://localhost:8000/demo/tms/shipments"})
-    connector_id = connector.json()["id"]
-    await http.put(f"/api/v1/connectors/{connector_id}/mappings", headers=first, json={"mappings": [{"source_field": "waybillNo", "target_field": "shipment_no", "required": True}]})
+    created = await http.post("/api/v1/connectors", headers=first, json={
+        "name": "Delayed TMS", "type": "rest", "base_url": "http://localhost:8000/demo/tms/shipments",
+    })
+    connector_id = created.json()["id"]
+    await http.put(f"/api/v1/connectors/{connector_id}/mappings", headers=first, json={"mappings": [
+        {"source_field": "number", "target_field": "shipment_no", "required": True},
+        {"source_field": "state", "target_field": "status"},
+        {"source_field": "arrival", "target_field": "planned_arrival_time"},
+    ]})
 
     async def fake_fetch(self, item, sample=False):
-        return [{"waybillNo": "YD-ANALYZE"}]
-
-    async def fake_generate(self, system, user):
-        assert "YD-ANALYZE" in user
-        return Generation(text='{"analysis":"车辆资料缺失，影响运输监控。","suggestion":"补录车辆和司机信息。"}', provider="test-llm", model="test-model", input_tokens=20, output_tokens=10)
+        return [{"number": "LATE-001", "state": "IN_TRANSIT",
+            "arrival": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()}]
 
     monkeypatch.setattr(ConnectorService, "fetch", fake_fetch)
-    monkeypatch.setattr(OpenAICompatibleProvider, "generate", fake_generate)
-    monkeypatch.setattr("app.services.exception_analysis.get_settings", lambda: SimpleNamespace(llm_api_key="test", llm_model="test-model"))
     imported = await http.post(f"/api/v1/connectors/{connector_id}/sync", headers=first)
-    exception_id = imported.json()["exception_ids"][0]
-    assert (await http.post(f"/api/v1/exceptions/{exception_id}/analyze", headers=second)).status_code == 404
+    assert imported.status_code == 200, imported.text
+    exceptions = await http.get("/api/v1/exceptions", headers=first, params={"type": "ARRIVAL_DELAY"})
+    exception_id = exceptions.json()["items"][0]["id"]
+
+    monkeypatch.setattr("app.services.exception_analysis.get_settings", lambda: type("Settings", (), {
+        "llm_api_key": "test-key", "llm_model": "test-model",
+    })())
+
+    async def fake_generate(self, system, user):
+        evidence = json.loads(user)
+        assert evidence["shipment"]["shipment_no"] == "LATE-001"
+        assert evidence["exception"]["type"] == "ARRIVAL_DELAY"
+        return Generation(text=json.dumps({"analysis": "已超过计划到达时间，实际原因尚待核实。",
+            "suggestion": "联系司机确认位置并更新预计到达时间。"}, ensure_ascii=False),
+            provider="mock-llm", model="test-model", input_tokens=50, output_tokens=30)
+
+    monkeypatch.setattr("app.services.exception_analysis.get_llm_provider", lambda: type("Provider", (), {"generate": fake_generate})())
     analyzed = await http.post(f"/api/v1/exceptions/{exception_id}/analyze", headers=first)
     assert analyzed.status_code == 200, analyzed.text
-    assert analyzed.json()["ai_analysis"] == "车辆资料缺失，影响运输监控。"
-    assert analyzed.json()["suggestion"] == "补录车辆和司机信息。"
+    assert analyzed.json()["ai_analysis"] == "已超过计划到达时间，实际原因尚待核实。"
+    assert analyzed.json()["suggestion"] == "联系司机确认位置并更新预计到达时间。"
+    detail = await http.get(f"/api/v1/exceptions/{exception_id}", headers=first)
+    assert detail.json()["ai_analysis"] == analyzed.json()["ai_analysis"]
+    assert (await http.get(f"/api/v1/exceptions/{exception_id}", headers=second)).status_code == 404

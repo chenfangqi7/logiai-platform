@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.llm.openai_compatible import OpenAICompatibleProvider
+from app.ai.gateway.provider import get_llm_provider
 from app.ai.tools.logistics import LogisticsTools
 from app.core.config import get_settings
 from app.models.domain import AIConversation, AIMessage, AIUsage
@@ -53,6 +53,14 @@ class AssistantService:
             evidence = await self.tools.get_exceptions(level="HIGH", today="今天" in question, limit=10)
             text = f"共找到 {evidence['total']} 条高风险异常。" + (" 优先处理：" + "；".join(item["reason"] for item in evidence["items"][:5]) if evidence["items"] else " 当前无高风险异常。")
             return "priority", evidence, text
+        if "在途" in question:
+            overview = await self.tools.dashboard.overview()
+            in_transit = await self.tools.search_shipments(status="IN_TRANSIT", limit=5)
+            text = f"当前在途运单共有 {overview['in_transit']} 票。"
+            if in_transit["items"]:
+                samples = "、".join(f"{item['shipment_no']}（{item['origin']}→{item['destination']}）" for item in in_transit["items"][:3])
+                text += f" 近期在途运单例如：{samples}。"
+            return "in_transit", {"overview": overview, "in_transit_shipments": in_transit}, text
         stats = await self.tools.get_exception_statistics(today=True)
         evidence = {"statistics": stats, "high_risk": await self.tools.get_exceptions(level="HIGH", today=True, limit=5)}
         if stats["exception_count"] == 0:
@@ -80,7 +88,7 @@ class AssistantService:
         settings = get_settings()
         if settings.llm_api_key and settings.llm_model and grounding:
             try:
-                generated = await OpenAICompatibleProvider().generate(
+                generated = await get_llm_provider().generate(
                     "你是物流运营助手。只允许依据给出的结构化数据回答；缺少证据时明确说明数据不足。不要编造运单、时间或原因。",
                     json.dumps({"question": question, "evidence": grounding}, ensure_ascii=False, default=str),
                 )

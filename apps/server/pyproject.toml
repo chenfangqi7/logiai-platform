@@ -23,6 +23,7 @@ dependencies = [
   "python-docx>=1.1,<2",
   "pgvector>=0.4,<1",
   "tzdata>=2025.1",
+  "cryptography>=44,<50",
 ]
 
 [project.optional-dependencies]

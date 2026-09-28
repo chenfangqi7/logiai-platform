@@ -7,7 +7,7 @@ import httpx
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.llm.openai_compatible import OpenAICompatibleProvider
+from app.ai.gateway.provider import get_llm_provider
 from app.core.config import get_settings
 from app.models.domain import AIUsage
 from app.repositories.analytics import AnalyticsRepository
@@ -80,7 +80,7 @@ class DashboardService:
         finally:
             await redis.aclose()
         try:
-            generation = await OpenAICompatibleProvider().generate(
+            generation = await get_llm_provider().generate(
                 "你是物流运营分析助手。仅根据结构化统计撰写简短中文摘要，不编造事实或趋势。",
                 json.dumps(evidence, ensure_ascii=False),
             )

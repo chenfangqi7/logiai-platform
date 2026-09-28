@@ -3,7 +3,7 @@ from redis.asyncio import Redis
 from sqlalchemy import text
 
 from app.api.auth import router as auth_router
-from app.api.connectors import router as connectors_router
+from app.api.connectors import mapping_router, router as connectors_router
 from app.api.shipments import router as shipments_router
 from app.api.exceptions import router as exceptions_router
 from app.api.dashboard import router as dashboard_router
@@ -17,6 +17,7 @@ from app.demo import router as demo_router
 app = FastAPI(title=get_settings().app_name)
 app.include_router(auth_router)
 app.include_router(connectors_router)
+app.include_router(mapping_router)
 app.include_router(shipments_router)
 app.include_router(exceptions_router)
 app.include_router(dashboard_router)

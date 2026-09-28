@@ -14,6 +14,10 @@ class LogisticsRepository:
     async def shipment_by_no(self, number: str) -> Shipment | None:
         return await self.session.scalar(select(Shipment).where(Shipment.tenant_id == self.tenant_id, Shipment.shipment_no == number))
 
+    async def shipment_by_source(self, connector_id: str, external_id: str) -> Shipment | None:
+        return await self.session.scalar(select(Shipment).where(Shipment.tenant_id == self.tenant_id,
+            Shipment.source_connector_id == connector_id, Shipment.source_external_id == external_id))
+
     async def shipment(self, shipment_id: str) -> Shipment | None:
         return await self.session.scalar(select(Shipment).where(Shipment.tenant_id == self.tenant_id, Shipment.id == shipment_id))
 

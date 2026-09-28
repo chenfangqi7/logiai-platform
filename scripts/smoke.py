@@ -11,8 +11,8 @@ import httpx
 
 async def main() -> None:
     base = os.getenv("SMOKE_BASE_URL", "http://127.0.0.1:8001")
-    password = os.getenv("DEV_ADMIN_PASSWORD", "change-this-development-password")
-    async with httpx.AsyncClient(base_url=base, timeout=30) as client:
+    password = os.getenv("DEV_ADMIN_PASSWORD", "123456")
+    async with httpx.AsyncClient(base_url=base, timeout=90) as client:
         health = (await client.get("/health")).json()
         login = await client.post("/api/v1/auth/login", json={"tenant_code": "demo", "username": "admin", "password": password})
         login.raise_for_status()
