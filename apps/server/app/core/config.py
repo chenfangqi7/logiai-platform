@@ -22,11 +22,23 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://api.openai.com/v1"
     llm_model: str = ""
-    llm_input_cost_per_million: float = 0.0
-    llm_output_cost_per_million: float = 0.0
+    llm_input_cost_per_million: float = 0.8
+    llm_output_cost_per_million: float = 2.7
+    fallback_llm_provider: str = "qwen"
+    fallback_llm_api_key: str = ""
+    fallback_llm_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    fallback_llm_model: str = "qwen3.8-flash"
+    fallback_llm_input_cost_per_million: float = 0.8
+    fallback_llm_output_cost_per_million: float = 2.7
     embedding_provider: str = ""
     embedding_api_key: str = ""
     embedding_model: str = ""
+
+    @property
+    def is_llm_enabled(self) -> bool:
+        primary_enabled = bool(self.llm_api_key and self.llm_model)
+        fallback_enabled = bool(self.fallback_llm_api_key and self.fallback_llm_model)
+        return primary_enabled or fallback_enabled
 
 
 @lru_cache

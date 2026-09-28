@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.gateway.provider import get_llm_provider
+from app.ai.gateway.provider import get_llm_provider, is_llm_configured
 from app.ai.tools.logistics import LogisticsTools
 from app.core.config import get_settings
 from app.models.domain import AIConversation, AIMessage, AIUsage
@@ -86,7 +86,7 @@ class AssistantService:
                 answer += f" 参考知识库：{knowledge[0]['content'][:180]}"
         provider_name, model, input_tokens, output_tokens, cost = "rules", None, 0, 0, 0.0
         settings = get_settings()
-        if settings.llm_api_key and settings.llm_model and grounding:
+        if is_llm_configured(settings) and grounding:
             try:
                 generated = await get_llm_provider().generate(
                     "你是物流运营助手。只允许依据给出的结构化数据回答；缺少证据时明确说明数据不足。不要编造运单、时间或原因。",

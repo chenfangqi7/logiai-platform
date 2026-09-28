@@ -3,12 +3,24 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from app.core.config import get_settings
 from app.core.security import hash_password
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.models.tenant import Tenant
 from app.models.user import User
+
+
+@pytest.fixture(autouse=True)
+def clean_llm_env(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "")
+    monkeypatch.setenv("LLM_MODEL", "")
+    monkeypatch.setenv("FALLBACK_LLM_API_KEY", "")
+    monkeypatch.setenv("FALLBACK_LLM_MODEL", "")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture

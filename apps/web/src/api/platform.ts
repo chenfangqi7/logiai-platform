@@ -68,4 +68,64 @@ export const platform = {
   addKnowledgeText: async (title: string, content: string) => (await api.post('/knowledge/text', { title, content })).data,
   uploadKnowledge: async (file: File) => { const body = new FormData(); body.append('file', file); return (await api.post('/knowledge/upload', body)).data },
   deleteKnowledge: async (id: string) => api.delete(`/knowledge/${id}`),
+  aiUsageDashboard: async () => (await api.get<AIUsageDashboard>('/ai/usage/dashboard')).data,
+  aiUsageLogs: async (params: Record<string, string | number> = {}) => (await api.get<Page<AIUsageLog>>('/ai/usage/logs', { params })).data,
+}
+
+export interface AIUsageLog {
+  id: string
+  purpose: string
+  entity_id: string | null
+  provider: string
+  model: string | null
+  input_tokens: number
+  output_tokens: number
+  cost: number
+  created_at: string
+}
+
+export interface AIUsageDashboard {
+  summary: {
+    total_calls: number
+    total_input_tokens: number
+    total_output_tokens: number
+    total_tokens: number
+    total_cost: number
+    today_calls: number
+    today_input_tokens: number
+    today_output_tokens: number
+    today_tokens: number
+    today_cost: number
+  }
+  trend: {
+    date: string
+    calls: number
+    tokens: number
+    cost: number
+  }[]
+  distribution_by_purpose: {
+    purpose: string
+    calls: number
+    tokens: number
+  }[]
+  distribution_by_model: {
+    model: string
+    calls: number
+    tokens: number
+  }[]
+  models_info: {
+    primary: {
+      provider: string
+      model: string
+      base_url: string
+      configured: boolean
+    }
+    fallback: {
+      provider: string
+      model: string
+      base_url: string
+      configured: boolean
+    }
+  }
+  recent_logs: AIUsageLog[]
 }

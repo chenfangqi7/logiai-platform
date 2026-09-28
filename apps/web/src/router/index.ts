@@ -19,6 +19,7 @@ const router = createRouter({
       { path: 'exceptions', component: () => import('../views/ExceptionsView.vue') },
       { path: 'exceptions/:id', component: () => import('../views/ExceptionDetailView.vue') },
       { path: 'ai', component: () => import('../views/AIView.vue') },
+      { path: 'ai-usage', component: () => import('../views/AIUsageView.vue') },
       { path: 'knowledge', component: () => import('../views/KnowledgeView.vue') },
       { path: 'settings', component: () => import('../views/SettingsView.vue') },
     ] },

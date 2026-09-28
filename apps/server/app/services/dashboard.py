@@ -7,7 +7,7 @@ import httpx
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.gateway.provider import get_llm_provider
+from app.ai.gateway.provider import get_llm_provider, is_llm_configured
 from app.core.config import get_settings
 from app.models.domain import AIUsage
 from app.repositories.analytics import AnalyticsRepository
@@ -65,7 +65,7 @@ class DashboardService:
                 lines.append(f"{top['route_name']} 线路异常最多，共 {top['exception_count']} 条，建议优先排查。")
             fallback = "\n".join(lines)
         settings = get_settings()
-        if not settings.llm_api_key or not settings.llm_model:
+        if not is_llm_configured(settings):
             return {"summary": fallback, "provider": "rules"}
         evidence = {"counts": counts, "route_ranking": ranking}
         digest = hashlib.sha256(json.dumps(evidence, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]

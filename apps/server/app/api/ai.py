@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.db.session import get_session
+from app.services.ai_usage import AIUsageService
 from app.services.assistant import AssistantService
 from app.services.auth import AuthenticatedUser
 
@@ -19,6 +20,10 @@ class ChatInput(BaseModel):
 
 def assistant(session: AsyncSession, current: AuthenticatedUser) -> AssistantService:
     return AssistantService(session, current.user.tenant_id, current.user.id)
+
+
+def usage_service(session: AsyncSession, current: AuthenticatedUser) -> AIUsageService:
+    return AIUsageService(session, current.user.tenant_id)
 
 
 @router.post("/chat")
@@ -40,3 +45,19 @@ async def conversation(conversation_id: str, session: Annotated[AsyncSession, De
     if result is None:
         raise HTTPException(404, "Conversation not found")
     return result
+
+
+@router.get("/usage/dashboard")
+async def usage_dashboard(session: Annotated[AsyncSession, Depends(get_session)], current: Annotated[AuthenticatedUser, Depends(get_current_user)]):
+    return await usage_service(session, current).dashboard()
+
+
+@router.get("/usage/logs")
+async def usage_logs(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    current: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    offset: int = 0,
+    limit: int = 50,
+):
+    return await usage_service(session, current).logs(offset=offset, limit=limit)
+

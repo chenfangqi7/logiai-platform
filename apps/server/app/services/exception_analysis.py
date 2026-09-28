@@ -3,7 +3,7 @@ import json
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.gateway.provider import get_llm_provider
+from app.ai.gateway.provider import get_llm_provider, is_llm_configured
 from app.core.config import get_settings
 from app.models.domain import AIUsage, LogisticsException
 from app.repositories.exceptions import ExceptionRepository
@@ -26,7 +26,7 @@ class ExceptionAnalysisService:
         if item is None:
             return None
         settings = get_settings()
-        if not settings.llm_api_key or not settings.llm_model:
+        if not is_llm_configured(settings):
             return item
         shipment = await LogisticsRepository(self.session, self.tenant_id).shipment(item.shipment_id)
         if shipment is None:
