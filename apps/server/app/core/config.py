@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,6 +10,16 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_name: str = "LogiAI Platform"
     database_url: str = "postgresql+asyncpg://logiai:logiai@localhost:5432/logiai"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, v: str) -> str:
+        if isinstance(v, str):
+            if v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
+                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            if "sslmode=" in v:
+                v = v.replace("sslmode=", "ssl=")
+        return v
     redis_url: str = "redis://localhost:6379/0"
     jwt_secret: str = "development-only-replace-before-deployment"
     connector_secret_key: str = ""
