@@ -15,8 +15,6 @@ from app.rules.evaluator import RuleEvaluator
 
 async def seed_development() -> None:
     settings = get_settings()
-    if settings.app_env != "development":
-        return
     async with SessionLocal() as session:
         tenant = await session.scalar(select(Tenant).where(Tenant.code == settings.dev_tenant_code))
         if tenant is None:
