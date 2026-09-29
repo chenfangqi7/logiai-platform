@@ -16,3 +16,5 @@ async def test_demo_tms_exposes_reproducible_event_ids_and_messy_cases(client):
     assert messy[5]["journey"]["events"]
     prefixed = (await http.get("/demo/tms/shipments?prefix=ACPT")).json()
     assert prefixed[0]["waybillNo"] == "ACPT000001"
+    fresh = (await http.get("/demo/tms/shipments?prefix=ACPT&fresh_relations=true")).json()
+    assert fresh[0]["driverCode"].startswith("ACPT") and fresh[0]["plateNo"].startswith("渝ACPT")

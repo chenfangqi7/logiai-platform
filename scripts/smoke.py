@@ -47,6 +47,7 @@ async def main() -> None:
         exceptions.raise_for_status()
         ai = await client.post("/api/v1/ai/chat", json={"message": "帮我分析今天的异常运输情况。"})
         ai.raise_for_status()
+        assert ai.json()["answer"]
         dashboard = await client.get("/api/v1/dashboard/overview")
         dashboard.raise_for_status()
         documents = await client.get("/api/v1/knowledge")
@@ -60,7 +61,7 @@ async def main() -> None:
             "health": health["status"], "sample_fields": len(sample.json()["fields"]),
             "import": imported, "mock_shipments": shipments.json()["total"],
             "exceptions": exceptions.json()["total"], "ai_provider": ai.json()["provider"],
-            "ai_answer": ai.json()["answer"], "dashboard": dashboard.json()["exception_count"],
+            "ai_answer_length": len(ai.json()["answer"]), "dashboard": dashboard.json()["exception_count"],
             "knowledge_hits": len(searched.json()),
         })
 

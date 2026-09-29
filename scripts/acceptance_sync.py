@@ -3,14 +3,15 @@
 import asyncio
 from datetime import datetime, timezone
 import os
+from uuid import uuid4
 
 import httpx
 
 
 async def main() -> None:
-    prefix = "T" + datetime.now(timezone.utc).strftime("%m%d%H%M%S")
+    prefix = "T" + datetime.now(timezone.utc).strftime("%m%d%H%M%S") + uuid4().hex[0].upper()
     base = os.getenv("SMOKE_BASE_URL", "http://127.0.0.1:8001")
-    source_url = f"http://server:8000/demo/tms/shipments?prefix={prefix}"
+    source_url = f"http://server:8000/demo/tms/shipments?prefix={prefix}&fresh_relations=true"
     async with httpx.AsyncClient(base_url=base, timeout=90) as client:
         login = await client.post("/api/v1/auth/login", json={"tenant_code": "demo", "username": "admin", "password": os.getenv("DEV_ADMIN_PASSWORD", "123456")})
         login.raise_for_status()

@@ -4,7 +4,7 @@ import json
 import socket
 from time import monotonic
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlparse
 
 import httpx
 
@@ -44,6 +44,9 @@ class RestApiConnector(BaseConnector):
     def __init__(self, url: str, config: dict, auth_type: str = "none", transport: httpx.AsyncBaseTransport | None = None) -> None:
         validate_connector_url(url)
         self.url = url
+        parsed = urlparse(url)
+        self.request_url = parsed._replace(query="").geturl()
+        self.base_params = dict(parse_qsl(parsed.query, keep_blank_values=True))
         self.config = config
         self.auth_type = auth_type
         self.transport = transport
@@ -64,6 +67,8 @@ class RestApiConnector(BaseConnector):
         if not isinstance(pagination, dict) or pagination.get("type", "NONE") not in {"NONE", "PAGE_NUMBER", "OFFSET_LIMIT", "CURSOR"}:
             raise ValueError("Unsupported pagination configuration")
         self.pagination = pagination
+        if self.method == "GET" and (pagination.get("location") == "body" or config.get("incremental_location") == "body"):
+            raise ValueError("GET connectors cannot send pagination or incremental parameters in a request body")
         if not 1 <= int(pagination.get("page_size", 100)) <= 500 or not 1 <= int(pagination.get("max_pages", 20)) <= 50:
             raise ValueError("Pagination size or page limit is out of range")
 
@@ -87,7 +92,7 @@ class RestApiConnector(BaseConnector):
         return headers
 
     def _request_parts(self, page: int, cursor: str | None) -> tuple[dict, dict]:
-        params = dict(self.config.get("query_params", {}))
+        params = {**self.base_params, **self.config.get("query_params", {})}
         body = dict(self.config.get("request_body", {}))
         if self.config.get("sync_mode", "FULL") == "INCREMENTAL" and self.config.get("last_sync_value"):
             key = str(self.config.get("incremental_param") or self.config.get("incremental_field") or "updated_at")
@@ -110,7 +115,7 @@ class RestApiConnector(BaseConnector):
         validate_connector_url(self.url)
         params, body = self._request_parts(page, cursor)
         started = monotonic()
-        async with client.stream(self.method, self.url, params=params, json=body if self.method == "POST" else None, headers=self._headers()) as response:
+        async with client.stream(self.method, self.request_url, params=params, json=body if self.method == "POST" else None, headers=self._headers()) as response:
             if response.status_code in {301, 302, 303, 307, 308}:
                 raise ValueError("Connector redirects are not supported")
             response.raise_for_status()

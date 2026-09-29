@@ -34,6 +34,8 @@ def test_rest_config_rejects_unbounded_timeout_and_unsafe_header():
         RestApiConnector("http://localhost:8000/mock", {"timeout_seconds": 0})
     with pytest.raises(ValueError, match="header"):
         RestApiConnector("http://localhost:8000/mock", {"header_name": "Host", "header_value": "secret"}, "header")._headers()
+    with pytest.raises(ValueError, match="GET connectors cannot"):
+        RestApiConnector("http://localhost:8000/mock", {"pagination": {"type": "PAGE_NUMBER", "location": "body"}})
 
 
 @pytest.mark.asyncio
@@ -50,3 +52,14 @@ async def test_get_without_pagination_returns_single_page():
     transport = httpx.MockTransport(lambda request: httpx.Response(200, json=[{"waybillNo": "A"}]))
     adapter = RestApiConnector("http://localhost:8000/mock", {}, transport=transport)
     assert await adapter.fetch_data() == [{"waybillNo": "A"}]
+
+
+@pytest.mark.asyncio
+async def test_url_query_is_preserved_when_config_has_no_query_params():
+    seen: list[str] = []
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.params["prefix"])
+        return httpx.Response(200, json=[{"waybillNo": "P-1"}])
+    adapter = RestApiConnector("http://localhost:8000/mock?prefix=ACPT", {}, transport=httpx.MockTransport(handler))
+    assert await adapter.fetch_data() == [{"waybillNo": "P-1"}]
+    assert seen == ["ACPT"]
